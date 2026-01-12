@@ -19,7 +19,7 @@ export default function Login() {
     setError("");
     try {
       await login(form.email.trim(), form.password);
-      const redirect = searchParams.get("redirect") || "/dashboard";
+      const redirect = searchParams.get("redirect") || "/home";
       navigate(redirect, { replace: true });
     } catch (err) {
       const message = err?.response?.data?.message || "Login failed";

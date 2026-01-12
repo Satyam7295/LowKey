@@ -34,10 +34,142 @@ const userSchema = new mongoose.Schema(
       type: String,
       default: ""
     },
+    tags: {
+      type: [String],
+      default: [],
+      validate: {
+        validator: function (arr) {
+          return arr.length <= 10;
+        },
+        message: "Maximum 10 tags allowed"
+      }
+    },
+    poll: {
+      question: {
+        type: String,
+        default: ""
+      },
+      options: {
+        type: [String],
+        default: [],
+        validate: {
+          validator: function (arr) {
+            return arr.length <= 5;
+          },
+          message: "Maximum 5 poll options allowed"
+        }
+      }
+    },
+    gallery: {
+      type: [String],
+      default: []
+    },
+    video: {
+      type: String,
+      default: ""
+    },
     bio: {
       type: String,
       default: "",
-      maxlength: 280
+      maxlength: 500
+    },
+    prompts: {
+      type: [
+        {
+          title: {
+            type: String,
+            required: true,
+            trim: true
+          },
+          answer: {
+            type: String,
+            required: true,
+            trim: true
+          },
+          createdAt: {
+            type: Date,
+            default: Date.now
+          }
+        }
+      ],
+      default: [],
+      validate: {
+        validator: function (arr) {
+          return arr.length <= 5;
+        },
+        message: "Maximum 5 prompts allowed"
+      }
+    },
+    friendRequests: {
+      type: [
+        {
+          from: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "User"
+          },
+          createdAt: {
+            type: Date,
+            default: Date.now
+          }
+        }
+      ],
+      default: []
+    },
+    pokes: {
+      type: [
+        {
+          from: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "User"
+          },
+          createdAt: {
+            type: Date,
+            default: Date.now
+          }
+        }
+      ],
+      default: []
+    },
+    asks: {
+      type: [
+        {
+          from: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "User"
+          },
+          message: {
+            type: String,
+            required: true,
+            trim: true
+          },
+          createdAt: {
+            type: Date,
+            default: Date.now
+          }
+        }
+      ],
+      default: []
+    },
+    spillback: {
+      type: [
+        {
+          question: {
+            type: String,
+            required: true,
+            trim: true
+          },
+          answer: {
+            type: String,
+            required: true,
+            trim: true
+          },
+          createdAt: {
+            type: Date,
+            default: Date.now
+          }
+        }
+      ],
+      default: []
     }
   },
   {
