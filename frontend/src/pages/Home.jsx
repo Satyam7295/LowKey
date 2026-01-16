@@ -1,13 +1,20 @@
 import { useEffect } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { useAnonymous } from "../context/AnonymousContext";
+import { useOnlineStatus } from "../hooks/useOnlineStatus";
+import ProfilePictureWithStatus from "../components/ProfilePictureWithStatus";
 
-const NAV_ITEMS = ["Home", "Feed", "Create", "Search", "Profile", "Notification", "My Spillback"];
+const NAV_ITEMS = ["Home", "Feed", "Create", "Search", "My Spillback", "Lobby", "Notification", "Profile", "Settings"];
 
 export default function Home() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const { isAnonymous, toggleAnonymous } = useAnonymous();
   const location = useLocation();
+  
+  // Initialize online status tracking
+  useOnlineStatus();
 
   const getActive = () => {
     if (location.pathname.startsWith("/profile")) return "Profile";
@@ -18,10 +25,14 @@ export default function Home() {
 
   const handleNavClick = (label) => {
     if (label === "Home") navigate("/home");
+    if (label === "Feed") navigate("/feed");
+    if (label === "Create") navigate("/create");
     if (label === "Search") navigate("/search");
-    if (label === "Profile") navigate("/profile/edit");
-    if (label === "Notification") navigate("/notifications");
     if (label === "My Spillback") navigate("/spillback");
+    if (label === "Lobby") navigate("/lobby");
+    if (label === "Notification") navigate("/notifications");
+    if (label === "Profile") navigate("/profile/edit");
+    if (label === "Settings") navigate("/settings");
   };
 
   useEffect(() => {
@@ -63,9 +74,6 @@ export default function Home() {
                     />
                     <span className="text-sm font-medium">{label}</span>
                   </div>
-                  {isActive && (
-                    <span className="text-[11px] uppercase tracking-wide text-cyan-300">Now</span>
-                  )}
                 </button>
               );
             })}
@@ -75,17 +83,76 @@ export default function Home() {
         <main className="flex-1 space-y-6">
           <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-900/60 border border-white/5 rounded-2xl p-5 shadow-lg shadow-cyan-500/10">
             <div>
-              <p className="text-xs uppercase tracking-[0.2em] text-slate-400">Currently Viewing</p>
               <h1 className="text-3xl font-semibold text-white">Home</h1>
-              <p className="text-sm text-slate-400 mt-1">Your overview and quick actions</p>
+            </div>
+            <div className="flex items-center gap-4">
+              <div className="relative inline-flex items-center">
+                <div className="flex items-center gap-2 bg-gradient-to-r from-slate-800 to-slate-900 border-2 border-slate-700 rounded-full p-1.5 shadow-inner">
+                  <button
+                    type="button"
+                    onClick={() => !isAnonymous || toggleAnonymous()}
+                    className={`relative px-5 py-2 rounded-full font-semibold text-sm transition-all duration-300 z-10 ${
+                      !isAnonymous
+                        ? "text-white"
+                        : "text-slate-400 hover:text-slate-300"
+                    }`}
+                  >
+                    <span className="relative z-10 flex items-center gap-2">
+                      <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
+                      </svg>
+                      Public
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => isAnonymous || toggleAnonymous()}
+                    className={`relative px-6 py-2 rounded-full font-semibold text-sm transition-all duration-300 z-10 ${
+                      isAnonymous
+                        ? "text-white"
+                        : "text-slate-400 hover:text-slate-300"
+                    }`}
+                  >
+                    <span className="relative z-10 flex items-center gap-2">
+                      <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M3.707 2.293a1 1 0 00-1.414 1.414l14 14a1 1 0 001.414-1.414l-1.473-1.473A10.014 10.014 0 0019.542 10C18.268 5.943 14.478 3 10 3a9.958 9.958 0 00-4.512 1.074l-1.78-1.781zm4.261 4.26l1.514 1.515a2.003 2.003 0 012.45 2.45l1.514 1.514a4 4 0 00-5.478-5.478z" />
+                        <path d="M12.454 16.697L9.75 13.992a4 4 0 01-3.742-3.741L2.335 6.578A9.98 9.98 0 00.458 10c1.274 4.057 5.065 7 9.542 7 .847 0 1.669-.105 2.454-.303z" />
+                      </svg>
+                      Anonymous
+                    </span>
+                  </button>
+                  <div
+                    className={`absolute top-1.5 h-[calc(100%-12px)] bg-gradient-to-r from-cyan-500 to-purple-500 rounded-full shadow-lg transition-all duration-300 ease-out ${
+                      !isAnonymous
+                        ? "left-1.5 w-[calc(50%-6px)]"
+                        : "left-[calc(50%+3px)] w-[calc(50%-6px)]"
+                    }`}
+                    style={{
+                      boxShadow: isAnonymous 
+                        ? "0 0 20px rgba(168, 85, 247, 0.4), 0 0 40px rgba(168, 85, 247, 0.2)"
+                        : "0 0 20px rgba(6, 182, 212, 0.4), 0 0 40px rgba(6, 182, 212, 0.2)"
+                    }}
+                  />
+                </div>
+              </div>
             </div>
           </header>
 
           <div className="grid gap-6 sm:grid-cols-2">
             <div className="bg-slate-900/70 border border-white/5 rounded-2xl p-6 shadow-xl shadow-cyan-500/10">
-              <h2 className="text-lg font-semibold mb-2">Welcome</h2>
-              <p className="text-slate-200/80">{user?.name || user?.username || "Friend"}</p>
-              <p className="text-sm text-slate-400 mt-2">@{user?.username}</p>
+              <div className="flex items-center gap-4 mb-4">
+                <ProfilePictureWithStatus 
+                  src={user?.profilePic} 
+                  alt={user?.username}
+                  isOnline={user?.isOnline}
+                  size="lg"
+                />
+                <div>
+                  <h2 className="text-lg font-semibold mb-1">Welcome</h2>
+                  <p className="text-slate-200/80">{user?.name || user?.username || "Friend"}</p>
+                  <p className="text-sm text-slate-400">@{user?.username}</p>
+                </div>
+              </div>
 
               <div className="mt-4 pt-4 border-t border-white/5">
                 {user?.bio ? (

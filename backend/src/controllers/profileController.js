@@ -397,13 +397,107 @@ export async function searchProfiles(req, res) {
 export async function getRecommendations(req, res) {
   const userId = req.user.id;
 
-  const recommendations = await User.find({ _id: { $ne: userId } })
-    .select("-password")
-    .limit(12);
+  // Get current user's profile to check their tags
+  const currentUser = await User.findById(userId).select("tags");
+  
+  let recommendations;
+  
+  // If user has tags, find users with similar tags
+  if (currentUser && currentUser.tags && currentUser.tags.length > 0) {
+    // Find users with at least one matching tag
+    const usersWithTags = await User.find({
+      _id: { $ne: userId },
+      tags: { $in: currentUser.tags }
+    })
+      .select("name username profilePic tags bio")
+      .lean();
+    
+    // Calculate similarity score
+    const usersWithScore = usersWithTags.map(user => {
+      const commonTags = user.tags ? user.tags.filter(tag => currentUser.tags.includes(tag)) : [];
+      return {
+        ...user,
+        commonTags,
+        similarityScore: commonTags.length
+      };
+    });
+    
+    // Sort by similarity score (most similar first)
+    usersWithScore.sort((a, b) => b.similarityScore - a.similarityScore);
+    
+    // Take top 12 or fill with random users if not enough
+    if (usersWithScore.length >= 12) {
+      recommendations = usersWithScore.slice(0, 12);
+    } else {
+      // Get additional random users to fill up to 12
+      const additionalCount = 12 - usersWithScore.length;
+      const excludeIds = [userId, ...usersWithScore.map(u => u._id)];
+      const additionalUsers = await User.find({
+        _id: { $nin: excludeIds }
+      })
+        .select("name username profilePic tags bio")
+        .limit(additionalCount)
+        .lean();
+      
+      recommendations = [...usersWithScore, ...additionalUsers];
+    }
+  } else {
+    // If user has no tags, return random users
+    recommendations = await User.find({ _id: { $ne: userId } })
+      .select("name username profilePic tags bio")
+      .limit(12)
+      .lean();
+  }
 
   res.status(200).json({
     success: true,
-    profiles: recommendations.map((p) => p.toJSON())
+    profiles: recommendations
+  });
+}
+
+export async function getSimilarUsers(req, res) {
+  const { username } = req.params;
+  const currentUserId = req.user.id;
+
+  // Get the target user's profile
+  const targetUser = await User.findOne({ username });
+  if (!targetUser) {
+    throw new ApiError(404, "User not found");
+  }
+
+  // If target user has no tags, return empty array
+  if (!targetUser.tags || targetUser.tags.length === 0) {
+    return res.status(200).json({
+      success: true,
+      users: []
+    });
+  }
+
+  // Find users with similar tags (excluding current user and target user)
+  const similarUsers = await User.find({
+    _id: { $nin: [currentUserId, targetUser._id] },
+    tags: { $in: targetUser.tags }
+  })
+    .select("name username profilePic tags bio")
+    .lean();
+
+  // Calculate similarity score and sort by it
+  const usersWithScore = similarUsers.map(user => {
+    const commonTags = user.tags ? user.tags.filter(tag => targetUser.tags.includes(tag)) : [];
+    return {
+      ...user,
+      commonTags,
+      similarityScore: commonTags.length
+    };
+  });
+
+  // Sort by similarity score (most similar first) and limit to exactly 4
+  usersWithScore.sort((a, b) => b.similarityScore - a.similarityScore);
+  const topFourUsers = usersWithScore.slice(0, 4);
+
+  res.status(200).json({
+    success: true,
+    users: topFourUsers
   });
 }
 
@@ -539,7 +633,8 @@ export async function replyToAsk(req, res) {
     // Add to spillback for public replies
     user.spillback.push({
       question: notification.message,
-      answer: answer.trim()
+      answer: answer.trim(),
+      isVisible: true
     });
     await user.save();
   } else {
@@ -581,5 +676,38 @@ export async function deleteSpillback(req, res) {
   res.status(200).json({
     success: true,
     message: "Spillback deleted"
+  });
+}
+export async function toggleSpillbackVisibility(req, res) {
+  const userId = req.user.id;
+  const { index } = req.params;
+
+  if (index === undefined || index === null) {
+    throw new ApiError(400, "Spillback index is required");
+  }
+
+  const user = await User.findById(userId);
+  if (!user) {
+    throw new ApiError(404, "User not found");
+  }
+
+  const spillbackIndex = parseInt(index, 10);
+  if (isNaN(spillbackIndex) || spillbackIndex < 0 || spillbackIndex >= user.spillback.length) {
+    throw new ApiError(400, "Invalid spillback index");
+  }
+
+  // Toggle visibility
+  if (!user.spillback[spillbackIndex].isVisible) {
+    user.spillback[spillbackIndex].isVisible = true;
+  } else {
+    user.spillback[spillbackIndex].isVisible = false;
+  }
+
+  await user.save();
+
+  res.status(200).json({
+    success: true,
+    message: user.spillback[spillbackIndex].isVisible ? "Spillback is now public" : "Spillback is now hidden",
+    user: user.toJSON()
   });
 }

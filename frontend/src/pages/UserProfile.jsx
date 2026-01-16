@@ -2,12 +2,15 @@ import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { profileApi } from "../api/profile";
+import ProfilePictureWithStatus from "../components/ProfilePictureWithStatus";
 
 export default function UserProfile() {
   const { username } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
   const [profile, setProfile] = useState(null);
+  const [onlineStatus, setOnlineStatus] = useState(null);
+  const [similarUsers, setSimilarUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [actionLoading, setActionLoading] = useState(false);
@@ -25,6 +28,25 @@ export default function UserProfile() {
     try {
       const response = await profileApi.getByUsername(username);
       setProfile(response.user);
+      
+      // Fetch similar users
+      try {
+        const similarRes = await profileApi.getSimilarUsers(username);
+        setSimilarUsers(similarRes.users || []);
+      } catch (err) {
+        console.error("Failed to fetch similar users:", err);
+      }
+      
+      // Fetch online status
+      try {
+        const statusRes = await fetch(`/api/auth/status/${username}`);
+        const statusData = await statusRes.json();
+        if (statusData.success) {
+          setOnlineStatus(statusData);
+        }
+      } catch (statusErr) {
+        console.error("Failed to fetch online status:", statusErr);
+      }
     } catch (err) {
       setError(err.response?.data?.message || "Failed to load profile");
     } finally {
@@ -147,23 +169,24 @@ export default function UserProfile() {
         <div className="bg-slate-900/70 border border-white/5 rounded-2xl p-8 shadow-xl shadow-cyan-500/10 mb-6">
           <div className="flex flex-col md:flex-row gap-6 items-start">
             <div className="flex flex-col items-center md:items-start">
-              {profile.profilePic ? (
-                <img
-                  src={profile.profilePic}
-                  alt={profile.username}
-                  className="h-32 w-32 rounded-full object-cover border-4 border-cyan-400/60 shadow-lg"
-                />
-              ) : (
-                <div className="h-32 w-32 rounded-full bg-slate-800 border-4 border-cyan-400/60 flex items-center justify-center">
-                  <svg className="w-16 h-16 text-slate-500" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
-                  </svg>
-                </div>
-              )}
+              <ProfilePictureWithStatus 
+                src={profile.profilePic} 
+                alt={profile.username}
+                isOnline={onlineStatus?.isOnline}
+                size="xl"
+              />
             </div>
 
             <div className="flex-1">
-              <h1 className="text-3xl font-bold text-white mb-2">{profile.name || profile.username}</h1>
+              <div className="flex items-center gap-3 mb-2">
+                <h1 className="text-3xl font-bold text-white">{profile.name || profile.username}</h1>
+                {onlineStatus?.isOnline && (
+                  <span className="flex items-center gap-1 px-3 py-1 bg-green-500/20 border border-green-400/40 rounded-full text-sm text-green-400">
+                    <span className="w-2 h-2 bg-green-400 rounded-full"></span>
+                    Online
+                  </span>
+                )}
+              </div>
               <p className="text-lg text-cyan-300 mb-4">@{profile.username}</p>
               
               {profile.tags && profile.tags.length > 0 && (
@@ -222,24 +245,6 @@ export default function UserProfile() {
                 <div key={index} className="bg-slate-800/50 border border-slate-700 rounded-lg p-4">
                   <p className="text-sm font-medium text-cyan-300 mb-2">{prompt.title}</p>
                   <p className="text-slate-200">{prompt.answer}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Poll Section */}
-        {profile.poll && (
-          <div className="bg-slate-900/70 border border-white/5 rounded-2xl p-6 shadow-xl shadow-cyan-500/10 mb-6">
-            <h2 className="text-xl font-semibold text-white mb-4">Poll</h2>
-            <p className="text-lg text-slate-200 mb-4">{profile.poll.question}</p>
-            <div className="space-y-2">
-              {profile.poll.options.map((option, index) => (
-                <div
-                  key={index}
-                  className="bg-slate-800/50 border border-slate-700 rounded-lg px-4 py-3 text-slate-300"
-                >
-                  {option}
                 </div>
               ))}
             </div>
@@ -309,6 +314,63 @@ export default function UserProfile() {
                       </p>
                     </div>
                   </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Similar Users Section */}
+        {similarUsers && similarUsers.length > 0 && (
+          <div className="bg-slate-900/70 border border-white/5 rounded-2xl p-6 shadow-xl shadow-purple-500/10 mb-6">
+            <div className="mb-6">
+              <h2 className="text-2xl font-bold text-white mb-2">You might also like 👥</h2>
+              <p className="text-slate-400 text-sm">Top 4 users with the most matching tags</p>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              {similarUsers.map((user) => (
+                <div
+                  key={user.id}
+                  className="bg-slate-800/50 border border-purple-400/20 rounded-xl p-4 hover:border-purple-400/40 transition cursor-pointer"
+                  onClick={() => navigate(`/user/${user.username}`)}
+                >
+                  <div className="flex items-center gap-3 mb-3">
+                    {user.profilePic ? (
+                      <img
+                        src={user.profilePic}
+                        alt={user.username}
+                        className="w-12 h-12 rounded-full object-cover border-2 border-purple-400/40"
+                      />
+                    ) : (
+                      <div className="w-12 h-12 rounded-full bg-slate-700 border-2 border-purple-400/40 flex items-center justify-center">
+                        <svg className="w-6 h-6 text-slate-500" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
+                        </svg>
+                      </div>
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-white truncate">{user.name || user.username}</p>
+                      <p className="text-sm text-slate-400 truncate">@{user.username}</p>
+                    </div>
+                  </div>
+                  {user.bio && (
+                    <p className="text-sm text-slate-300 mb-2 line-clamp-2">{user.bio}</p>
+                  )}
+                  {user.commonTags && user.commonTags.length > 0 && (
+                    <div className="flex flex-wrap gap-1">
+                      {user.commonTags.slice(0, 3).map((tag) => (
+                        <span
+                          key={tag}
+                          className="text-xs bg-purple-500/20 border border-purple-400/30 text-purple-300 px-2 py-0.5 rounded-full"
+                        >
+                          {tag}
+                        </span>
+                      ))}
+                      {user.commonTags.length > 3 && (
+                        <span className="text-xs text-purple-400">+{user.commonTags.length - 3}</span>
+                      )}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
